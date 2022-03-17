@@ -1,9 +1,41 @@
 #coding=utf-8
 
 from flask import Flask, redirect, request, jsonify,render_template,url_for
+from threading import Thread
+from flask_mail import Mail,Message
 import json
 app=Flask(__name__)
 app.config["DEBUG"]=True
+
+app.config['MAIL_DEBUG'] = True             # 开启debug，便于调试看信息
+app.config['MAIL_SUPPRESS_SEND'] = False    # 发送邮件，为True则不发送
+app.config["MAIL_SERVER"] = "smtp.qq.com"
+app.config["MAIL_PORT"] = 465
+app.config["MAIL_USE_SSL"] = True
+app.config["MAIL_USE_TLS"] = False
+app.config["MAIL_USERNAME"] = "92468880@qq.com"
+app.config["MAIL_DEFAULT_SENDER"] = "92468880@qq.com"
+app.config["MAIL_PASSWORD"] = "zqmzwxamhtiqbdgg"
+mail = Mail(app)
+
+@app.route("/send_mail")
+def send_mail():
+    """
+    发送邮件
+    """
+    message = Message("标题",recipients=["chen.wenjun@vhd.com.cn"])
+    message.body = "内容"
+    
+    t = Thread(target=send_email,args=(message,))
+    t.start()
+    
+    return "发送成功"
+    
+def send_email(msg):
+    with app.app_context():
+        mail.send(msg)
+
+
 @app.route("/")
 def index():
     #传递参数给html,html中获取方式： {{变量}}
