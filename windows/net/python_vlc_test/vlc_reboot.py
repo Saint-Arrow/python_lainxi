@@ -1,16 +1,23 @@
-import os, time
+import os, time,sys
 
 #方法1：直接指定库
-#os.environ['PYTHON_VLC_LIB_PATH']='C:\\Users\Acer\Desktop\python_vlc_test\libvlc.dll'
+#os.environ['PYTHON_VLC_LIB_PATH']='C:\\Users\\chen.wenjun\\AppData\\Local\\Programs\\Python\\Python38\\DLLs\\libvlc.dll'
 #方法2：指定模块路径
 #os.environ['PYTHON_VLC_MODULE_PATH']='C:\\Users\\Acer\\Desktop\\test\python_vlc_test'
-#os.environ['PATHON_VLC_MODULE_PATH']="D:\\WORK\\VHD_CWJ_File\\tool\\python\\python_vlc_test"
+os.environ['PYTHON_VLC_MODULE_PATH']="F:\\WORK\\VHD_CWJ_File\\tool\\python\\python\\windows\\net\\python_vlc_test"
 #trust_path = os.environ.get('PYTHON_VLC_MODULE_PATH', None)
 #os.add_dll_directory(trust_path);
 
 import vlc
-ip="192.168.13.160"
 import time
+
+path = os.path.dirname(__file__)
+os.chdir(path)
+target_dir = os.path.join(path,"..", "telnet_get_cmd_output")
+# 将目标目录的路径添加到 sys.path 中
+sys.path.append(target_dir)
+import telnet_cmd
+
 
 class Player:
     '''
@@ -125,11 +132,16 @@ class Player:
         return self.media.video_get_width()
     def video_get_height(self):
         return self.media.video_get_height()
+    
 
+        
 def my_call_back(event,user_data):
     end=time.perf_counter()
     print("###:"+ str(end-start))
     print("play info:"+str(player.video_get_height())+" "+str(player.video_get_width())+" "+str(player.audio_get_delay()))
+def stream_play_ok(event,user_data):
+    status=user_data
+    status[0]=1
 
 def mkdir(path):
     # 引入模块
@@ -171,31 +183,55 @@ def udp_sendmsg(ip,port,str):
 if "__main__" == __name__:
     
     t=0
-	
-    mkdir(".\\output")
-    
+    print("当前脚本目录:", os.path.dirname(__file__))
+    mkdir(os.path.dirname(__file__)+".\\output")
+    #ip="192.168.15.35"
+    ip="192.168.15.142"
     while 1==1:
-        player = Player()  
-  
+        t=t+1
+        player = Player("--no-video-title-show","--no-xlib")  
+        #player.add_callback(vlc.EventType.MediaStateChanged, on_media_state_changed,0)
+        stream_status=[0]
+        player.add_callback(vlc.EventType.MediaPlayerPlaying, stream_play_ok,stream_status)
+        #player.add_callback(vlc.EventType.MediaPlayerEncounteredError, my_call_back,1)
         start=time.perf_counter();
-        player.add_callback(vlc.EventType.MediaPlayerPlaying, my_call_back,0)
-        player.add_callback(vlc.EventType.MediaPlayerEncounteredError, my_call_back,1)
-        player.add_callback(vlc.EventType.MediaPlayerPositionChanged, my_call_back,2)
-		
+        #player.add_callback(vlc.EventType.MediaPlayerPositionChanged, my_call_back,2)
+        print("try to get rtsp,cnt:" + str(t)+" ip:"+ip);
         player.play("rtsp://"+ip+"/1")
-   
- 
         time.sleep(3)
-        player.take_snapshot(0,os.getcwd()+"\\output\\"+ip+"_"+str(t)+".jpg",1280,720)
         
-        time.sleep(40)
+
+        check_cnt=0
+        while check_cnt<=40:
+            time.sleep(1)
+            check_cnt=check_cnt+1
+            if stream_status[0]==1:
+                print("vlc stream ok")
+                player.take_snapshot(0,os.path.dirname(__file__)+"\\output\\"+ip+"_"+str(t)+".jpg",1280,720)
+
+                #检测机器是否有重启过
+                if t!=1:
+                    cmd_output=telnet_cmd.telnet_execute_command(ip,23,"root",None,"cat /proc/uptime |awk -e '{print $1}'")
+                    camera_run_time=float(cmd_output[1])
+                    print(camera_run_time)
+                    if camera_run_time > 100:
+                        print("camera reboot fail")
+                        stream_status[0]=2
+                break
+        
         player.stop()
         player.release()
         time.sleep(3)
-        t=t+1
+        if stream_status[0]!=1:
+            print("get vlc stream fail");
+            break
 		
-        udp_sendmsg(ip,1259,'8101040002ff')
-        time.sleep(60)
+        print("try to reboot,cnt:" + str(t));
+        if 1==1:
+            udp_sendmsg(ip,1259,'8101040003ff')
+            time.sleep(1)
+            udp_sendmsg(ip,1259,'8101040002ff')
+            time.sleep(30)
         
 
 
